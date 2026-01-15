@@ -59,12 +59,13 @@ export default class KnowmeldPlugin extends Plugin {
     this.syncer = new FileSyncer(this.app.vault, cacheStore, settingsStore);
     this.addSettingTab(this.settingTab);
     this.registerObsidianProtocolHandler("knowmeld-auth", async (params) => {
-      const { pairingCode } = params;
-      if (pairingCode) {
+      const { pairingCode, correlationId } = params;
+      if (pairingCode && correlationId) {
         const formData = new FormData();
         formData.append("pairing_code", pairingCode as string);
+        formData.append("correlation_id", correlationId as string);
         formData.append("device_id", this.data.settings.deviceId);
-        const resp = await fetch(`${this.data.settings.apiUrl}/v1/auth/device-tokens/pairing-complete`, {
+        const resp = await fetch(`${this.data.settings.apiUrl}/auth/device-tokens/pairing-complete`, {
           method: "POST",
           body: formData,
         });

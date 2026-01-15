@@ -78,7 +78,7 @@ export class FileSyncer {
       formData.append("upload_session_id", uploadSessionId);
       formData.append("correlation_id", correlationId);
 
-      const response = await fetch(`${settings.apiUrl}/v1/upload`, {
+      const response = await fetch(`${settings.apiUrl}/upload`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${settings.accessToken}`,
@@ -161,14 +161,14 @@ export class FileSyncer {
     }
 
     try {
+      const formData = new FormData();
+      formData.append("refresh_token", settings.refreshToken!);
       const response = await fetch(`${settings.apiUrl}/auth/device-tokens/refresh`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${settings.accessToken}`,
         },
-        body: JSON.stringify({
-          refresh_token: settings.refreshToken,
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -193,7 +193,7 @@ export class FileSyncer {
 
   async startSync(): Promise<Record<string, string> | void> {
     try {
-      const resp = await fetch(`${this.settingsStore.get().apiUrl}/v1/upload/start`, {
+      const resp = await fetch(`${this.settingsStore.get().apiUrl}/upload/start`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${this.settingsStore.get().accessToken}`,
@@ -205,7 +205,14 @@ export class FileSyncer {
           new Notice("Knowmeld: Your device has not been connected. Please connect in the settings.");
           return;
         }
-        throw new Error(`HTTP ${resp.status}`);
+        if (resp.status === 401) {
+          const authenticated = await this.authenticate();
+          if (authenticated) {
+            return this.startSync();
+          } else {
+            throw new Error("Authentication failed");
+          }
+        }
       }
       const { upload_session_id, correlation_id } = await resp.json();
       return { upload_session_id, correlation_id };
@@ -219,7 +226,7 @@ export class FileSyncer {
 
   async finishSync(uploadSessionId: string): Promise<void> {
     try {
-      const resp = await fetch(`${this.settingsStore.get().apiUrl}/v1/upload/complete?upload_session_id=${uploadSessionId}`, {
+      const resp = await fetch(`${this.settingsStore.get().apiUrl}/upload/complete?upload_session_id=${uploadSessionId}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${this.settingsStore.get().accessToken}`,
@@ -227,7 +234,14 @@ export class FileSyncer {
         },
       });
       if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}`);
+        if (resp.status === 401) {
+          const authenticated = await this.authenticate();
+          if (authenticated) {
+            return this.finishSync(uploadSessionId);
+          } else {
+            throw new Error("Authentication failed");
+          }
+        }
       }
     } catch (error) {
       console.error("Sync finish error:", error);

@@ -24,7 +24,7 @@ export class KnowmeldSettingTab extends PluginSettingTab {
       .addButton((btn) =>
         btn.setButtonText("Connect").onClick(async () => {
           window.open(
-            `${this.settingsStore.get().apiUrl}/dashboard/obsidian/connect?device_id=${this.settingsStore.get().deviceId}`
+            `${this.settingsStore.get().dashboardUrl}/dashboard/obsidian/connect?device_id=${this.settingsStore.get().deviceId}`
           )
         })).setDisabled(!!this.settingsStore.get().refreshToken);
 
