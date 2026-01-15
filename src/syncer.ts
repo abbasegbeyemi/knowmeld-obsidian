@@ -176,10 +176,10 @@ export class FileSyncer {
       }
 
       const data = await response.json();
-      const { access_token } = data;
+      const { access_token, refresh_token } = data;
 
       if (access_token) {
-        this.settingsStore.set({ accessToken: access_token });
+        this.settingsStore.set({ accessToken: access_token, refreshToken: refresh_token });
         this.cacheStore.save();
       }
 
