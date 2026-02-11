@@ -5,14 +5,19 @@ import { KnowmeldSettingTab } from "./settings";
 import { DEFAULT_SETTINGS, KnowmeldSettings } from "./settings.store";
 import { Authenticator } from "./authenticator";
 
+interface CacheEntry {
+  hash: string;
+  documentId?: string;
+}
+
+interface CacheData {
+  [path: string]: CacheEntry;
+}
+
 type PersistedData = {
   cache: CacheData;
   log?: string;
   settings: KnowmeldSettings;
-}
-
-interface CacheData {
-  [path: string]: string;
 }
 
 interface PersistedCache {
@@ -20,6 +25,8 @@ interface PersistedCache {
   set(path: string, hash: string): void;
   remove(path: string): void;
   rename(oldPath: string, newPath: string): void;
+  getDocumentId(path: string): string | undefined;
+  setDocumentId(path: string, documentId: string): void;
   save(): Promise<void>;
 }
 
@@ -37,15 +44,26 @@ export default class KnowmeldPlugin extends Plugin {
   };
 
   async onload(): Promise<void> {
-    const loadedData: Partial<PersistedData> = await this.loadData();
+    const loadedData = await this.loadData();
+    // Migrate old cache format (string hash) to new format ({ hash, documentId })
+    const rawCache = loadedData?.cache || {};
+    const migratedCache: CacheData = {};
+    for (const [path, value] of Object.entries(rawCache)) {
+      if (typeof value === 'string') {
+        migratedCache[path] = { hash: value };
+      } else {
+        migratedCache[path] = value as CacheEntry;
+      }
+    }
     this.data = {
-      cache: loadedData?.cache || {},
+      cache: migratedCache,
       settings: { ...DEFAULT_SETTINGS, ...loadedData?.settings },
     }
     const cacheStore: PersistedCache = {
-      get: (path: string) => this.data.cache[path],
+      get: (path: string) => this.data.cache[path]?.hash,
       set: (path: string, hash: string) => {
-        this.data.cache[path] = hash;
+        const existing = this.data.cache[path];
+        this.data.cache[path] = { ...existing, hash };
       },
       remove: (path: string) => {
         delete this.data.cache[path];
@@ -54,6 +72,12 @@ export default class KnowmeldPlugin extends Plugin {
         if (this.data.cache[oldPath]) {
           this.data.cache[newPath] = this.data.cache[oldPath];
           delete this.data.cache[oldPath];
+        }
+      },
+      getDocumentId: (path: string) => this.data.cache[path]?.documentId,
+      setDocumentId: (path: string, documentId: string) => {
+        if (this.data.cache[path]) {
+          this.data.cache[path].documentId = documentId;
         }
       },
       save: async () => {
@@ -163,9 +187,12 @@ export default class KnowmeldPlugin extends Plugin {
         if (!ready) return;
         if (file.path.endsWith(".md")) {
           console.log(`Knowmeld: Queuing deleted file ${file.path}`);
-          this.data.settings.deletedFiles.push(file.path);
-          this.persistData();
+          const documentId = this.data.cache[file.path]?.documentId;
+          if (documentId) {
+            this.data.settings.deletedDocumentIds.push(documentId);
+          }
           this.syncer.handleDelete(file.path);
+          this.persistData();
         }
       })
     );
@@ -184,7 +211,7 @@ export default class KnowmeldPlugin extends Plugin {
 
     // Flush deleted files every 10 minutes
     this.registerInterval(
-      window.setInterval(() => this.flushDeletedFiles(), 10 * 60 * 1000)
+      window.setInterval(() => this.flushDeletedFiles(), 5 * 60 * 1000)
     );
   }
 
@@ -237,13 +264,13 @@ export default class KnowmeldPlugin extends Plugin {
   }
 
   private async flushDeletedFiles(): Promise<void> {
-    const deletedFiles = this.data.settings.deletedFiles;
-    if (deletedFiles.length === 0) return;
+    const deletedDocumentIds = this.data.settings.deletedDocumentIds;
+    if (deletedDocumentIds.length === 0) return;
     if (!await this.authenticator.ensureAuthenticated()) return;
 
-    const success = await this.syncer.sendDeletedFiles(deletedFiles);
+    const success = await this.syncer.sendDeletedDocuments(deletedDocumentIds);
     if (success) {
-      this.data.settings.deletedFiles = [];
+      this.data.settings.deletedDocumentIds = [];
       await this.persistData();
     }
   }

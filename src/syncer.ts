@@ -1,6 +1,5 @@
 import { TFile, Vault, Notice, getFrontMatterInfo, App } from "obsidian";
 import { KnowmeldSettingStore } from "./settings.store";
-import * as path from "path/win32";
 
 
 
@@ -15,6 +14,8 @@ interface PersistedCache {
   set(path: string, hash: string): void;
   remove(path: string): void;
   rename(oldPath: string, newPath: string): void;
+  getDocumentId(path: string): string | undefined;
+  setDocumentId(path: string, documentId: string): void;
   save(): Promise<void>;
 }
 
@@ -108,7 +109,7 @@ export class FileSyncer {
       formData.append("file_path", file.path);
       formData.append("metadata", JSON.stringify(metadata));
 
-      const response = await fetch(`${settings.apiUrl}/files/upload`, {
+      const response = await fetch(`${settings.apiUrl}/files/upload/file`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.authenticator.getAccessToken()}`,
@@ -121,7 +122,11 @@ export class FileSyncer {
         throw new Error(`HTTP ${response.status}`);
       }
 
+      const responseData = await response.json();
       this.cacheStore.set(file.path, hash);
+      if (responseData.details.document_id) {
+        this.cacheStore.setDocumentId(file.path, responseData.details.document_id);
+      }
       await this.cacheStore.save();
 
       return SyncDecision.SYNC;
@@ -199,8 +204,8 @@ export class FileSyncer {
       return;
     }
     try {
-      const resp = await fetch(`${this.settingsStore.get().apiUrl}/files/upload`, {
-        method: "GET",
+      const resp = await fetch(`${this.settingsStore.get().apiUrl}/files/upload/start`, {
+        method: "POST",
         headers: {
           Authorization: `Bearer ${this.authenticator.getAccessToken()}`,
           "X-Idempotency-Key": crypto.randomUUID(),
@@ -228,8 +233,8 @@ export class FileSyncer {
       return;
     }
     try {
-      await fetch(`${this.settingsStore.get().apiUrl}/files/upload`, {
-        method: "DELETE",
+      await fetch(`${this.settingsStore.get().apiUrl}/files/upload/complete`, {
+        method: "POST",
         headers: {
           Authorization: `Bearer ${this.authenticator.getAccessToken()}`,
           "Content-Type": "application/json",
@@ -254,20 +259,20 @@ export class FileSyncer {
     this.cacheStore.rename(oldPath, newPath);
   }
 
-  async sendDeletedFiles(paths: string[]): Promise<boolean> {
-    if (paths.length === 0) return true;
+  async sendDeletedDocuments(documentIds: string[]): Promise<boolean> {
+    if (documentIds.length === 0) return true;
 
     const settings = this.settingsStore.get();
-    this.authenticator.ensureAuthenticated();
+    if (!await this.authenticator.ensureAuthenticated()) return false;
 
     try {
-      const response = await fetch(`${settings.apiUrl}/file`, {
+      const response = await fetch(`${settings.apiUrl}/files/documents`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${this.authenticator.getAccessToken()}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ paths }),
+        body: JSON.stringify({ document_ids: documentIds }),
       });
 
       if (!response.ok) {
@@ -276,7 +281,7 @@ export class FileSyncer {
 
       return true;
     } catch (error) {
-      console.error("Failed to send deleted files:", error);
+      console.error("Failed to send deleted documents:", error);
       return false;
     }
   }

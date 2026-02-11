@@ -12,7 +12,7 @@ export interface KnowmeldSettings {
     authDetails?: AuthDetails;
     excludedFolders: string[];
     realtimeSyncInterval: number;  // seconds, default 120 (2 min)
-    deletedFiles: string[];        // paths pending deletion notification
+    deletedDocumentIds: string[];   // document UUIDs pending deletion
 }
 
 export interface KnowmeldSettingStore {
@@ -26,9 +26,9 @@ export const DEFAULT_SETTINGS: KnowmeldSettings = {
         : "http://localhost:8000/v1",
     dashboardUrl: process.env.NODE_ENV === "production"
         ? "https://dashboard.knowmeld.io"
-        : "http://localhost:8000/dashboard",
+        : "http://localhost:8000",
     authDetails: undefined,
     excludedFolders: [],
     realtimeSyncInterval: 120,
-    deletedFiles: [],
+    deletedDocumentIds: [],
 };
