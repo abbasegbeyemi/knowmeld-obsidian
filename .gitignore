@@ -3,4 +3,5 @@ node_modules/
 .knowmeld-cache.json
 .DS_Store
 data.json
-
+dist/
+dist_prod/
