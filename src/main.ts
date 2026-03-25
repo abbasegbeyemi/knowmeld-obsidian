@@ -30,7 +30,7 @@ export default class KnowmeldPlugin extends Plugin {
     await this.persistData();
 
     this.authenticator = new Authenticator(this.settingsStore, this.cacheStore);
-    this.settingTab = new KnowmeldSettingTab(this.app, this, this.settingsStore, this.authenticator);
+    this.settingTab = new KnowmeldSettingTab(this.app, this, this.settingsStore, this.authenticator, this.cacheStore);
     this.syncer = new FileSyncer(this.app, this.app.vault, this.cacheStore, this.settingsStore, this.authenticator);
     this.realtimeSync = new RealtimeSyncQueue(
       this.authenticator,

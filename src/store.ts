@@ -63,6 +63,11 @@ export class CacheStore implements PersistedCache {
   getData(): CacheData {
     return this.data;
   }
+
+  async clear(): Promise<void> {
+    this.data = {};
+    await this.saveCallback();
+  }
 }
 
 export class SettingsStore implements KnowmeldSettingStore {

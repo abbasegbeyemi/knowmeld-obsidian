@@ -1,8 +1,9 @@
 import {
-  App, PluginSettingTab, Setting,
+  App, Notice, PluginSettingTab, Setting,
 } from "obsidian";
 import type KnowmeldPlugin from "./main";
 import { KnowmeldSettingStore } from "./settings.store";
+import type { CacheStore } from "./store";
 
 interface IAuthenticator {
   connect(isConnected: boolean): Promise<void>;
@@ -13,12 +14,14 @@ export class KnowmeldSettingTab extends PluginSettingTab {
   plugin: KnowmeldPlugin;
   settingsStore: KnowmeldSettingStore;
   authenticator: IAuthenticator;
+  cacheStore: CacheStore;
 
-  constructor(app: App, plugin: KnowmeldPlugin, settingsStore: KnowmeldSettingStore, authenticator: IAuthenticator) {
+  constructor(app: App, plugin: KnowmeldPlugin, settingsStore: KnowmeldSettingStore, authenticator: IAuthenticator, cacheStore: CacheStore) {
     super(app, plugin);
     this.plugin = plugin;
     this.settingsStore = settingsStore;
     this.authenticator = authenticator;
+    this.cacheStore = cacheStore;
   }
 
   display(): void {
@@ -70,6 +73,19 @@ export class KnowmeldSettingTab extends PluginSettingTab {
             this.settingsStore.set({ realtimeSyncInterval: seconds });
             await this.plugin.persistData();
             this.display(); // Refresh to update description
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Clear sync cache")
+      .setDesc("Force all files to be re-uploaded on next sync by clearing the local hash cache")
+      .addButton((btn) =>
+        btn
+          .setButtonText("Clear cache")
+          .setWarning()
+          .onClick(async () => {
+            await this.cacheStore.clear();
+            new Notice("Knowmeld: Sync cache cleared");
           })
       );
 
