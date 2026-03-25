@@ -20,6 +20,8 @@ export default class KnowmeldPlugin extends Plugin {
 
     const cacheData = CacheStore.fromRaw(loadedData?.cache || {});
     const mergedSettings = { ...DEFAULT_SETTINGS, ...loadedData?.settings };
+    mergedSettings.apiUrl = DEFAULT_SETTINGS.apiUrl;
+    mergedSettings.appUrl = DEFAULT_SETTINGS.appUrl;
     if (!mergedSettings.vaultId) {
       mergedSettings.vaultId = crypto.randomUUID();
     }
